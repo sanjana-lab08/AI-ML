@@ -144,22 +144,6 @@ if st.button("Predict House Price"):
             "furnishingstatus_unfurnished": "Furnishing Status"
         }
 
-        report = []
-
-        for feature, value in zip(feature_columns, contributions):
-            if feature == "furnishingstatus_semi-furnished":
-                continue
-
-            if feature == "furnishingstatus_unfurnished":
-                semi = contributions[
-                    feature_columns.index("furnishingstatus_semi-furnished")
-                ]
-                value = value + semi
-
-            report.append({
-                "Factor": names[feature],
-                "Contribution": f"₹{value:+,.2f}"
-            })
 
         report = []
 
