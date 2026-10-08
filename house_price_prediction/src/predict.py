@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import shap
 
 model = joblib.load("../models/house_price_model.pkl")
 feature_columns = joblib.load("../models/feature_columns.pkl")
@@ -16,27 +17,26 @@ st.write("Enter the details of the house to predict its price.")
 
 area = st.number_input(
     "Area (sq ft)",
-    min_value=0,
     value=5000
 )
 
 bedrooms = st.number_input(
     "Number of Bedrooms",
-    min_value=0,
+    
     value=3,
     step=1
 )
 
 bathrooms = st.number_input(
     "Number of Bathrooms",
-    min_value=0,
+    
     value=2,
     step=1
 )
 
 stories = st.number_input(
     "Number of Stories",
-    min_value=0,
+    
     value=2,
     step=1
 )
@@ -68,7 +68,7 @@ airconditioning = st.selectbox(
 
 parking = st.number_input(
     "Parking Spaces",
-    min_value=0,
+    
     value=2,
     step=1
 )
@@ -109,8 +109,86 @@ input_data = input_data.reindex(
 )
 
 if st.button("Predict House Price"):
-    prediction = model.predict(input_data)
+    if area <= 0 or bedrooms < 0 or bathrooms < 0 or stories < 0 or parking < 0:
+        st.error("Please enter valid values. Area must be greater than 0.")
+    else:
+        prediction = model.predict(input_data)
 
-    st.success(
-        f"Predicted House Price: ₹{prediction[0]:,.2f}"
-    )
+        st.success(
+            f"Predicted House Price: ₹{prediction[0]:,.2f}"
+        )
+
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer(input_data)
+
+        base_price = explainer.expected_value[0]
+        contributions = shap_values.values[0]
+
+        st.subheader("🏠 Price Explanation")
+
+        st.write(f"**Base Model Price:** ₹{base_price:,.2f}")
+
+        names = {
+            "area": "Area",
+            "bedrooms": "Bedrooms",
+            "bathrooms": "Bathrooms",
+            "stories": "Stories",
+            "parking": "Parking",
+            "mainroad_yes": "Main Road",
+            "guestroom_yes": "Guest Room",
+            "basement_yes": "Basement",
+            "hotwaterheating_yes": "Hot Water Heating",
+            "airconditioning_yes": "Air Conditioning",
+            "prefarea_yes": "Preferred Area",
+            "furnishingstatus_semi-furnished": "Furnishing Status",
+            "furnishingstatus_unfurnished": "Furnishing Status"
+        }
+
+        report = []
+
+        for feature, value in zip(feature_columns, contributions):
+            if feature == "furnishingstatus_semi-furnished":
+                continue
+
+            if feature == "furnishingstatus_unfurnished":
+                semi = contributions[
+                    feature_columns.index("furnishingstatus_semi-furnished")
+                ]
+                value = value + semi
+
+            report.append({
+                "Factor": names[feature],
+                "Contribution": f"₹{value:+,.2f}"
+            })
+
+        report = []
+
+        for feature, value in zip(feature_columns, contributions):
+            if feature == "furnishingstatus_semi-furnished":
+                continue
+
+            if feature == "furnishingstatus_unfurnished":
+                semi = contributions[
+                    feature_columns.index("furnishingstatus_semi-furnished")
+                ]
+                value = value + semi
+
+            report.append({
+                "Feature": names[feature],
+                "Impact on Prediction": f"₹{abs(value):,.2f}"
+            })
+
+        report = pd.DataFrame(report)
+
+        
+
+        st.write(
+            "The values below show how strongly each feature "
+            "influenced the predicted price."
+        )
+
+        st.dataframe(
+            report,
+            hide_index=True,
+            width="stretch"
+        )
